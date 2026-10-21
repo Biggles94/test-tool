@@ -744,7 +744,6 @@
       if (shortLbl) shortLbl.textContent = refresh ? "Refresh" : "Market data";
     }
   }
-
   function renderMarketPanel(d) {
     const panel = $("#marketPanel");
     if (!panel) return;
@@ -781,7 +780,6 @@
       warningBlock(d);
   }
 
-  /* NEW — renders any partial-failure warnings from the Worker */
   function warningBlock(d) {
     const warnings = (d && d.warnings) || [];
     if (!warnings.length) return "";
@@ -800,6 +798,7 @@
              '</div>' +
            '</div>';
   }
+
 
   /* ------------------------------------------------------------------ *
    *  PDF — page 1 (cover + unit details)
@@ -1005,12 +1004,40 @@
     if (range) doc.text("Range " + range, x + 7, y + 31.5);
   }
 
+  function drawStatsBand(doc, x, y, w, h, stats) {
+    doc.setFillColor(GREY_LIGHT[0], GREY_LIGHT[1], GREY_LIGHT[2]);
+    doc.roundedRect(x, y, w, h, 3, 3, "F");
+    doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+    doc.rect(x, y, 2.4, h, "F");
+
+    const colW = w / stats.length;
+    stats.forEach((s, i) => {
+      const cx = x + colW * i + 8;
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7);
+      doc.setTextColor(GREY_700[0], GREY_700[1], GREY_700[2]);
+      doc.text(s.label, cx, y + 8, { charSpace: 0.4 });
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(s.small ? 9.5 : 18);
+      doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+      doc.text(s.value, cx, y + (s.small ? 17 : 20));
+
+      if (i > 0) {
+        doc.setDrawColor(GREY_LINE[0], GREY_LINE[1], GREY_LINE[2]);
+        doc.setLineWidth(0.25);
+        doc.line(x + colW * i, y + 4, x + colW * i, y + h - 4);
+      }
+    });
+  }
+
   function buildMarketPage(doc, market) {
     if (!market) return;
     const W = 210, M = 16, RIGHT = W - M;
     doc.addPage();
 
-    /* page header */
+    // header band
     doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
     doc.rect(0, 0, W, 28, "F");
 
@@ -1021,13 +1048,13 @@
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    const q = (market.query || {});
+    const q = market.query || {};
     doc.text(
       "Prepared for " + (clean(q.make) + " " + clean(q.model)).trim(),
       RIGHT, 17, { align: "right" }
     );
 
-    /* title */
+    // title + snapshot date
     doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(18);
@@ -1038,32 +1065,23 @@
     doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
     const snap = market.fetchedAt ? new Date(market.fetchedAt) : new Date();
     doc.text(
-      "Snapshot as of " + snap.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }),
+      "Snapshot as of " + snap.toLocaleDateString("en-GB", {
+        day: "2-digit", month: "long", year: "numeric"
+      }),
       M, 51
     );
 
-    /* key metrics */
-    const cardY = 62;
-    const cardW = (RIGHT - M - 8) / 2;
-    const cardH = 34;
     const al = market.activeListings || {};
     const ac = market.auctionComps || {};
 
-    drawMetricCard(doc, M, cardY, cardW, cardH,
-      "ACTIVE COMPARABLE UNITS",
-      String(al.count == null ? "—" : al.count),
-      "Median asking " + fmtMoney(al.medianPrice),
-      al.priceRange
-    );
-    drawMetricCard(doc, M + cardW + 8, cardY, cardW, cardH,
-      "RECENT AUCTION SALES",
-      String(ac.count == null ? "—" : ac.count),
-      "Median sold " + fmtMoney(ac.medianSoldPrice),
-      ac.soldRange
-    );
-
-    /* active listings */
-    let ty = cardY + cardH + 18;
+    // ================= ACTIVE LISTINGS =================
+    let ty = 60;
+    drawStatsBand(doc, M, ty, RIGHT - M, 26, [
+      { label: "UNITS ON MARKET", value: String(al.count == null ? "—" : al.count) },
+      { label: "MEDIAN ASKING", value: fmtMoney(al.medianPrice) },
+      { label: "PRICE RANGE", value: al.priceRange || "—", small: true },
+    ]);
+    ty += 26 + 12;
 
     doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
     doc.rect(M, ty, 3, 6, "F");
@@ -1085,13 +1103,12 @@
     headers.forEach((h, i) => doc.text(h.toUpperCase(), colX[i] + 2, ty + 5.2, { charSpace: 0.3 }));
     ty += 8;
 
-    const listings = al.examples || [];
+    const listings = (al.examples || []).slice(0, 6);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
 
     listings.forEach((l) => {
-      if (ty > 250) return;
       const title = doc.splitTextToSize(l.title || "—", colW[1] - 4)[0] || "—";
       doc.text(String(l.year || "—"), colX[0] + 2, ty + 5);
       doc.text(title, colX[1] + 2, ty + 5);
@@ -1109,12 +1126,20 @@
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
       doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
-      doc.text("No matching active listings were returned for this query.", M, ty + 6);
-      ty += 12;
+      doc.text("No matching active listings were returned for this query.", M, ty + 5);
+      ty += 10;
     }
 
-    /* auctions */
-    ty += 6;
+    ty += 10;
+
+    // ================= AUCTION RESULTS =================
+    drawStatsBand(doc, M, ty, RIGHT - M, 26, [
+      { label: "RECENT AUCTION SALES", value: String(ac.count == null ? "—" : ac.count) },
+      { label: "MEDIAN SOLD", value: fmtMoney(ac.medianSoldPrice) },
+      { label: "SOLD RANGE", value: ac.soldRange || "—", small: true },
+    ]);
+    ty += 26 + 10;
+
     doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
     doc.rect(M, ty, 3, 6, "F");
     doc.setFont("helvetica", "bold");
@@ -1123,9 +1148,10 @@
     doc.text("RECENT AUCTION RESULTS", M + 6, ty + 5);
     ty += 10;
 
-    const auctions = ac.recent || [];
+    const auctions = (ac.recent || []).slice(0, 4);
     auctions.forEach((a) => {
-      if (ty > 260) return;
+      if (ty > 262) return;
+
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
@@ -1143,17 +1169,17 @@
 
       doc.setDrawColor(GREY_LINE[0], GREY_LINE[1], GREY_LINE[2]);
       doc.line(M, ty + 12, RIGHT, ty + 12);
-      ty += 15;
+      ty += 13;
     });
 
     if (!auctions.length) {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9);
       doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
-      doc.text("No matching sold auction results were returned for this query.", M, ty + 6);
+      doc.text("No matching sold auction results were returned for this query.", M, ty + 5);
     }
 
-    /* footer + disclaimer */
+    // footer + disclaimer
     doc.setDrawColor(GREY_LINE[0], GREY_LINE[1], GREY_LINE[2]);
     doc.setLineWidth(0.4);
     doc.line(M, 274, RIGHT, 274);
