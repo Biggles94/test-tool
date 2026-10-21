@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#EA580C" />
+<meta name="format-detection" content="telephone=no" />
+<title>Equipment Valuation Report Builder</title>
+
+<!-- PDF engine -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+  :root{
+    --orange:#EA580C;
+    --orange-dark:#C2410C;
+    --orange-soft:#FFF1E7;
+    --grey-900:#262626;
+    --grey-700:#4B4B4B;
+    --grey-500:#7A7A7A;
+    --grey-300:#D6D6D8;
+    --grey-200:#E9E9EB;
+    --grey-100:#F5F5F6;
+    --bg:#F2F2F3;
+    color-scheme: light;
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html{
+    margin:0;
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+    color-scheme:light;
+  }
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--grey-900);
+    min-height:100vh;
+    min-height:100dvh;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    display:flex; flex-wrap:wrap; gap:14px;
+    align-items:center; justify-content:space-between;
+    padding:14px 20px;
+    padding-left:max(20px, env(safe-area-inset-left));
+    padding-right:max(20px, env(safe-area-inset-right));
+    background:#fff;
+    border-bottom:3px solid var(--orange);
+    box-shadow:0 2px 12px rgba(0,0,0,.06);
+  }
+  .brand{display:flex; align-items:center; gap:12px; min-width:0}
+  .logo{
+    width:42px;height:42px;flex:none;border-radius:11px;
+    background:var(--orange); color:#fff;
+    display:grid;place-items:center;
+    font-weight:800; font-size:14px; letter-spacing:.03em;
+  }
+  .brand h1{font-size:16px; margin:0; line-height:1.2}
+  .brand p{margin:2px 0 0; font-size:12px; color:var(--grey-500)}
+  .actions{display:flex; gap:9px; flex-wrap:wrap}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    font:inherit; font-size:14px; font-weight:600;
+    min-height:44px;
+    padding:10px 16px; border-radius:9px; cursor:pointer;
+    border:1.5px solid transparent; white-space:nowrap;
+    touch-action:manipulation;
+    -webkit-user-select:none; user-select:none;
+    transition:background .15s, border-color .15s, color .15s, transform .05s;
+  }
+  .btn:active{transform:translateY(1px)}
+  .btn:disabled{opacity:.45; cursor:not-allowed}
+  .btn-primary{background:var(--orange); color:#fff; box-shadow:0 2px 0 var(--orange-dark)}
+  .btn-primary:hover:not(:disabled){background:var(--orange-dark)}
+  .btn-outline{border-color:var(--grey-300); background:#fff; color:var(--grey-700)}
+  .btn-outline:hover:not(:disabled){border-color:var(--orange); color:var(--orange)}
+  .btn-ghost{background:var(--grey-100); color:var(--grey-700)}
+  .btn-ghost:hover:not(:disabled){background:var(--grey-200)}
+
+  /* ---------- layout ---------- */
+  .wrap{
+    max-width:980px; margin:0 auto;
+    padding:26px 20px 70px;
+    padding-left:max(20px, env(safe-area-inset-left));
+    padding-right:max(20px, env(safe-area-inset-right));
+    display:grid; gap:20px;
+  }
+  #reportForm{display:grid; gap:20px;}
+
+  .card{
+    background:#fff; border:1px solid var(--grey-200);
+    border-radius:14px; padding:22px 22px 24px;
+    box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .card-head{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    flex-wrap:wrap;
+    margin:0 0 20px; padding-bottom:14px;
+    border-bottom:1px solid var(--grey-200);
+  }
+  .card-head h2{
+    display:flex; align-items:center;
+    font-size:14px; margin:0; letter-spacing:.05em; text-transform:uppercase;
+  }
+  .card-head h2::before{
+    content:""; width:4px; height:15px; border-radius:2px;
+    background:var(--orange); margin-right:10px;
+  }
+  .card-head-actions{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .pill{
+    background:var(--orange-soft); color:var(--orange-dark);
+    font-size:11px; font-weight:700; letter-spacing:.09em;
+    text-transform:uppercase; padding:5px 11px; border-radius:999px;
+  }
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:18px}
+  .grid + .grid{margin-top:18px}
+  .field{min-width:0}
+  .field.full{grid-column:1 / -1}
+
+  label{
+    display:block; margin-bottom:7px;
+    font-size:11.5px; font-weight:700; letter-spacing:.07em;
+    text-transform:uppercase; color:var(--grey-700);
+  }
+
+  input[type="text"], input[type="date"]{
+    width:100%;
+    min-height:46px;
+    padding:12px 13px;
+    font:inherit; font-size:16px; line-height:1.25;
+    color:var(--grey-900);
+    background:#fff;
+    border:1.5px solid var(--grey-300); border-radius:9px;
+    touch-action:manipulation;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input[type="text"]{ -webkit-appearance:none; appearance:none; }
+  input[type="date"]{ -webkit-appearance:none; appearance:none; min-width:0; }
+  input::placeholder{color:#A6A6A8; opacity:1}
+  input:hover{border-color:#BFBFC1}
+  input:focus{
+    outline:none; border-color:var(--orange);
+    box-shadow:0 0 0 3.5px rgba(234,88,12,.16);
+  }
+  input[type="date"]::-webkit-date-and-time-value{ text-align:left; }
+  input[type="date"]::-webkit-calendar-picker-indicator{ opacity:.65; }
+
+  /* ---------- photo ---------- */
+  .photo-row{display:flex; gap:18px; align-items:center; flex-wrap:wrap}
+  .photo-preview{
+    width:106px; height:106px; flex:none; overflow:hidden;
+    border-radius:12px; border:2px dashed var(--grey-300);
+    background:var(--grey-100);
+    display:grid; place-items:center;
+    color:var(--grey-500); font-size:11.5px; line-height:1.35; text-align:center;
+    cursor:pointer; touch-action:manipulation;
+    transition:border-color .15s, background .15s;
+  }
+  .photo-preview:hover, .photo-preview:focus-visible{
+    border-color:var(--orange); background:var(--orange-soft); outline:none;
+  }
+  .photo-preview img{width:100%; height:100%; object-fit:cover; display:block}
+  .photo-preview.has-photo{border-style:solid; border-color:var(--orange)}
+  .photo-actions{display:flex; flex-direction:column; gap:9px; align-items:flex-start}
+  .hint{margin:0; font-size:12px; color:var(--grey-500); max-width:340px; line-height:1.5}
+
+  /* ---------- market panel ---------- */
+  #marketStatus{
+    margin-top:14px;
+    min-height:1.4em;
+  }
+  .metric-label{
+    display:block; margin-bottom:4px;
+    font-size:11px; font-weight:700; letter-spacing:.07em;
+    text-transform:uppercase; color:var(--grey-700);
+  }
+  .metric-value{
+    display:block;
+    font-size:30px; font-weight:800; line-height:1;
+    color:var(--grey-900); margin:4px 0 6px;
+  }
+  .metric-sub{ margin:0; font-size:12px; color:var(--grey-500); line-height:1.5 }
+  .metric-sub strong{ color:var(--grey-700); }
+
+  /* ---------- toast ---------- */
+  #toast{
+    position:fixed; left:50%;
+    bottom:calc(26px + env(safe-area-inset-bottom));
+    transform:translate(-50%,16px);
+    background:var(--grey-900); color:#fff;
+    padding:12px 20px; border-radius:10px;
+    font-size:14px; font-weight:600; line-height:1.4;
+    opacity:0; pointer-events:none; transition:.25s ease; z-index:50;
+    box-shadow:0 8px 24px rgba(0,0,0,.22);
+    max-width:min(90vw, 480px); text-align:center;
+  }
+  #toast.show{opacity:1; transform:translate(-50%,0)}
+
+  footer.page-foot{
+    text-align:center; font-size:12px; color:var(--grey-500);
+    padding:0 20px calc(34px + env(safe-area-inset-bottom));
+    line-height:1.6;
+  }
+
+  .sr-file{
+    position:absolute; width:1px; height:1px;
+    padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0 0 0 0); clip-path:inset(50%);
+    white-space:nowrap; border:0;
+  }
+
+  .lbl-short{display:none}
+
+  /* ---------- phone layout ---------- */
+  @media (max-width:640px){
+    .topbar{padding:12px 14px; gap:10px}
+    .brand p{display:none}
+    .brand h1{font-size:15px}
+    .actions{width:100%; display:flex; gap:8px; flex-wrap:nowrap}
+    .actions .btn{flex:1 1 0; min-width:0; padding:11px 6px; font-size:13px}
+    .lbl-long{display:none}
+    .lbl-short{display:inline}
+    .wrap{padding:18px 14px 60px}
+    .card{padding:18px 16px 20px; border-radius:12px}
+    .card-head h2{font-size:13px}
+    .card-head{margin-bottom:16px; padding-bottom:12px}
+    .grid{gap:15px; grid-template-columns:1fr}
+    .metric-value{font-size:26px}
+  }
+</style>
+</head>
+
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">VR</span>
+    <div>
+      <h1>Valuation Report Builder</h1>
+      <p>Market-aware valuation reports → PDF</p>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="btnNew" class="btn btn-ghost" type="button">New</button>
+    <button id="btnImport" class="btn btn-ghost" type="button">Import</button>
+    <button id="btnExport" class="btn btn-outline" type="button">Export</button>
+    <button id="btnPdf" class="btn btn-primary" type="button"><span class="lbl-long">Generate </span>PDF</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <form id="reportForm" autocomplete="off" novalidate>
+
+    <!-- ============ COVER ============ -->
+    <section class="card">
+      <div class="card-head">
+        <h2>Cover information</h2>
+        <span class="pill">Seller / Customer</span>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label for="customerName">Customer name</label>
+          <input id="customerName" type="text" placeholder="e.g. Northline Construction Ltd." autocapitalize="words" />
+        </div>
+        <div class="field">
+          <label for="subtitle">Subtitle</label>
+          <input id="subtitle" type="text" placeholder="e.g. Equipment Valuation — Q3 2025" />
+        </div>
+      </div>
+
+      <div class="field full" style="margin-top:18px">
+        <label for="btnPhoto">Customer photo</label>
+        <div class="photo-row">
+          <div id="photoPreview" class="photo-preview" role="button" tabindex="0" aria-label="Upload customer photo">
+            <span>Tap to<br />add photo</span>
+          </div>
+          <div class="photo-actions">
+            <button id="btnPhoto" class="btn btn-outline" type="button">Upload photo</button>
+            <button id="btnPhotoClear" class="btn btn-ghost" type="button">Remove photo</button>
+            <p class="hint">JPG or PNG. The photo is embedded in the PDF and stored inside the exported project file.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ UNIT ============ -->
+    <section class="card">
+      <div class="card-head">
+        <h2>Unit information</h2>
+        <div class="card-head-actions">
+          <button id="btnMarket" class="btn btn-outline" type="button">
+            <span class="lbl-long">Fetch market data</span>
+            <span class="lbl-short">Market data</span>
+          </button>
+          <span class="pill">Equipment</span>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label for="year">Year</label>
+          <input id="year" type="text" inputmode="numeric" maxlength="4" placeholder="e.g. 2019" />
+        </div>
+        <div class="field">
+          <label for="make">Make</label>
+          <input id="make" type="text" placeholder="e.g. Caterpillar" autocapitalize="words" />
+        </div>
+        <div class="field">
+          <label for="model">Model</label>
+          <input id="model" type="text" placeholder="e.g. 336 GC" />
+        </div>
+        <div class="field">
+          <label for="equipmentType">Equipment type</label>
+          <input id="equipmentType" type="text" list="equipTypes" placeholder="e.g. Excavator" autocapitalize="words" />
+          <datalist id="equipTypes">
+            <option>Excavator</option>
+            <option>Wheel Loader</option>
+            <option>Bulldozer</option>
+            <option>Backhoe Loader</option>
+            <option>Skid Steer</option>
+            <option>Motor Grader</option>
+            <option>Compactor</option>
+            <option>Dump Truck</option>
+            <option>Crane</option>
+            <option>Forklift</option>
+            <option>Generator</option>
+            <option>Other</option>
+          </datalist>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label for="hours">Hours / Usage</label>
+          <input id="hours" type="text" inputmode="numeric" placeholder="e.g. 4,800" />
+        </div>
+        <div class="field">
+          <label for="condition">Condition</label>
+          <input id="condition" type="text" placeholder="e.g. Excellent / Good / Fair" />
+        </div>
+        <div class="field">
+          <label for="serial">Serial / VIN</label>
+          <input id="serial" type="text" placeholder="e.g. CAT0336GC..." autocapitalize="characters" />
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label for="region">Region</label>
+          <input id="region" type="text" placeholder="e.g. Northern Region" autocapitalize="words" />
+        </div>
+        <div class="field">
+          <label for="windowStart">Use window — start</label>
+          <input id="windowStart" type="date" />
+        </div>
+        <div class="field">
+          <label for="windowEnd">Use window — end</label>
+          <input id="windowEnd" type="date" />
+        </div>
+      </div>
+
+      <div id="marketStatus" class="hint" aria-live="polite"></div>
+    </section>
+
+  </form>
+
+  <div id="marketPanel" class="card" style="display:none;"></div>
+</main>
+
+<footer class="page-foot">
+  Drafts are saved automatically in this browser. Export a project file to move a report between devices.
+</footer>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<!-- Rendered (not display:none) so iOS reliably opens them from script -->
+<input id="photoInput" class="sr-file" type="file" accept="image/*" tabindex="-1" aria-hidden="true" />
+<input id="importInput" class="sr-file" type="file" accept="application/json,.json" tabindex="-1" aria-hidden="true" />
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================================================================== *
+   *  CONFIG — your Worker route from Part 1.
+   * ================================================================== */
+  const MARKET_API = "https://YOUR-WORKER-SUBDOMAIN.workers.dev/market";
+
+  /* ------------------------------------------------------------------ *
+   *  Palette (PDF)
+   * ------------------------------------------------------------------ */
+  const ORANGE       = [234, 88, 12];
+  const ORANGE_SOFT  = [255, 224, 204];
+  const GREY_DARK    = [38, 38, 38];
+  const GREY_700     = [75, 75, 75];
+  const GREY_500     = [122, 122, 122];
+  const GREY_LIGHT   = [245, 245, 246];
+  const GREY_300     = [214, 214, 216];
+  const GREY_LINE    = [222, 222, 224];
+
+  const PHOTO_MAX_SIDE = 1200;
+  const PHOTO_QUALITY  = 0.88;
+
+  /* ------------------------------------------------------------------ *
+   *  Elements
+   * ------------------------------------------------------------------ */
+  const $ = (sel) => document.querySelector(sel);
+
+  const fields = {
+    customerName:  $("#customerName"),
+    subtitle:      $("#subtitle"),
+    year:          $("#year"),
+    make:          $("#make"),
+    model:         $("#model"),
+    equipmentType: $("#equipmentType"),
+    hours:         $("#hours"),
+    condition:     $("#condition"),
+    serial:        $("#serial"),
+    region:        $("#region"),
+    windowStart:   $("#windowStart"),
+    windowEnd:     $("#windowEnd")
+  };
+
+  const photoPreview = $("#photoPreview");
+  const photoInput   = $("#photoInput");
+  const importInput  = $("#importInput");
+  const STORAGE_KEY  = "eq-valuation-draft-v2";
+
+  let photoData = "";
+  let photoW = 0;
+  let photoH = 0;
+  let marketData = null;
+  let busy = false;
+  let marketBusy = false;
+  let draftWarned = false;
+  let toastTimer;
+
+  /* ------------------------------------------------------------------ *
+   *  Small helpers
+   * ------------------------------------------------------------------ */
+  const clean = (v) => (v === null || v === undefined ? "" : String(v).trim());
+
+  const slug = (s) => clean(s).toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "valuation";
+
+  function toast(msg) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 3000);
+  }
+
+  function fmtMoney(n) {
+    if (n == null || !Number.isFinite(Number(n))) return "—";
+    return "$" + Math.round(Number(n)).toLocaleString("en-US");
+  }
+
+  function fmtDate(iso) {
+    if (!clean(iso)) return "";
+    const parts = iso.split("-").map(Number);
+    if (!parts[0] || !parts[1] || !parts[2]) return "";
+    const d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    return d.toLocaleDateString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric", timeZone: "UTC"
+    });
+  }
+
+  function windowText(d) {
+    const a = fmtDate(d.windowStart);
+    const b = fmtDate(d.windowEnd);
+    if (a && b) return a + "  \u2013  " + b;
+    if (a) return "From " + a;
+    if (b) return "Until " + b;
+    return "\u2014";
+  }
+
+  function readAsDataURL(file) {
+    return new Promise(function (resolve, reject) {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error("read-failed"));
+      r.readAsDataURL(file);
+    });
+  }
+
+  function loadImage(src) {
+    return new Promise(function (resolve, reject) {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("decode-failed"));
+      img.src = src;
+    });
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Device detection
+   *  Phone / tablet → system share sheet.
+   *  Desktop       → straight to the Downloads folder.
+   * ------------------------------------------------------------------ */
+  function isPhoneOrTablet() {
+    const ua = navigator.userAgent || "";
+    const mobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile Safari|Mobi/i.test(ua);
+    // iPadOS 13+ masquerades as Macintosh; touch points are the giveaway.
+    const iPadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    return mobileUA || iPadOS;
+  }
+
+  function fallbackDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 8000);
+  }
+
+  function deliverBlob(blob, filename) {
+    // Desktop: always save to disk. Windows Chrome/Edge advertise
+    // navigator.share with files and would otherwise pop the share dialog.
+    if (!isPhoneOrTablet()) {
+      fallbackDownload(blob, filename);
+      return;
+    }
+
+    // Phone / tablet: hand off to the system share sheet.
+    let file = null;
+    if (typeof File === "function") {
+      try { file = new File([blob], filename, { type: blob.type || "application/octet-stream" }); }
+      catch (e) { file = null; }
+    }
+
+    if (file && typeof navigator.canShare === "function" && typeof navigator.share === "function") {
+      let can = false;
+      try { can = navigator.canShare({ files: [file] }); } catch (e) { can = false; }
+      if (can) {
+        navigator.share({ files: [file], title: filename })
+          .catch(function (err) {
+            if (!err || err.name !== "AbortError") fallbackDownload(blob, filename);
+          });
+        return;
+      }
+    }
+    fallbackDownload(blob, filename);
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Data model
+   * ------------------------------------------------------------------ */
+  function getData() {
+    const d = {};
+    Object.keys(fields).forEach((k) => { d[k] = fields[k].value; });
+    d.photo = photoData || "";
+    d.photoW = photoW || 0;
+    d.photoH = photoH || 0;
+    d.marketData = marketData || null;
+    return d;
+  }
+
+  function setData(d) {
+    Object.keys(fields).forEach((k) => {
+      fields[k].value = clean(d[k]);
+    });
+    photoData = typeof d.photo === "string" ? d.photo : "";
+    photoW = Number(d.photoW) || 0;
+    photoH = Number(d.photoH) || 0;
+    renderPhoto();
+
+    if (d.marketData && typeof d.marketData === "object" && d.marketData.activeListings) {
+      marketData = d.marketData;
+      renderMarketPanel(marketData);
+    } else {
+      marketData = null;
+      $("#marketPanel").style.display = "none";
+    }
+
+    saveDraft();
+  }
+
+  function saveDraft() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(getData()));
+    } catch (e) {
+      if (!draftWarned) {
+        draftWarned = true;
+        toast("Draft is too large to auto-save — export it to keep your work.");
+      }
+    }
+  }
+
+  function loadDraft() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) setData(JSON.parse(raw));
+    } catch (e) { /* ignore corrupt draft */ }
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Photo handling
+   * ------------------------------------------------------------------ */
+  function renderPhoto() {
+    if (photoData) {
+      photoPreview.innerHTML = '<img src="' + photoData + '" alt="Customer photo" />';
+      photoPreview.classList.add("has-photo");
+    } else {
+      photoPreview.innerHTML = "<span>Tap to<br />add photo</span>";
+      photoPreview.classList.remove("has-photo");
+    }
+    $("#btnPhotoClear").disabled = !photoData;
+  }
+
+  async function shrinkImage(file, maxSide, quality) {
+    let bitmap = null;
+    let source = null;
+    let w = 0;
+    let h = 0;
+
+    if (typeof createImageBitmap === "function") {
+      try { bitmap = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+      catch (e1) {
+        try { bitmap = await createImageBitmap(file); }
+        catch (e2) { bitmap = null; }
+      }
+    }
+
+    if (bitmap) {
+      w = bitmap.width;
+      h = bitmap.height;
+    } else {
+      const dataUrl = await readAsDataURL(file);
+      const img = await loadImage(dataUrl);
+      source = img;
+      w = img.naturalWidth;
+      h = img.naturalHeight;
+    }
+
+    if (!w || !h) throw new Error("decode-failed");
+
+    const scale = Math.min(1, maxSide / Math.max(w, h));
+    const cw = Math.max(1, Math.round(w * scale));
+    const ch = Math.max(1, Math.round(h * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.drawImage(bitmap || source, 0, 0, cw, ch);
+
+    if (bitmap && typeof bitmap.close === "function") bitmap.close();
+
+    return { dataUrl: canvas.toDataURL("image/jpeg", quality), w: cw, h: ch };
+  }
+
+  async function handlePhotoFile(file) {
+    if (!file) return;
+    if (file.type && !file.type.startsWith("image/")) {
+      toast("Please choose an image file (JPG or PNG).");
+      return;
+    }
+    try {
+      const result = await shrinkImage(file, PHOTO_MAX_SIDE, PHOTO_QUALITY);
+      photoData = result.dataUrl;
+      photoW = result.w;
+      photoH = result.h;
+      renderPhoto();
+      saveDraft();
+      toast("Photo added.");
+    } catch (err) {
+      console.error(err);
+      toast("Couldn't read that image. Try a JPG or PNG (iPhone: Settings → Camera → Formats → Most Compatible).");
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Market data
+   * ------------------------------------------------------------------ */
+  async function fetchMarketData() {
+    if (marketBusy) return;
+
+    if (MARKET_API.indexOf("YOUR-WORKER") !== -1) {
+      toast("Set MARKET_API in the script to your Worker URL first.");
+      return;
+    }
+
+    const year  = clean(fields.year.value);
+    const make  = clean(fields.make.value);
+    const model = clean(fields.model.value);
+
+    if (!make || !model) {
+      toast("Enter at least a make and model before fetching market data.");
+      return;
+    }
+
+    marketBusy = true;
+    const btn = $("#btnMarket");
+    const status = $("#marketStatus");
+    const longLbl = btn.querySelector(".lbl-long");
+    const shortLbl = btn.querySelector(".lbl-short");
+    btn.disabled = true;
+    if (longLbl) longLbl.textContent = "Fetching…";
+    if (shortLbl) shortLbl.textContent = "…";
+    status.textContent = "Checking recent listings and auction comps…";
+
+    try {
+      const url = MARKET_API +
+        "?year="  + encodeURIComponent(year)  +
+        "&make="  + encodeURIComponent(make)  +
+        "&model=" + encodeURIComponent(model);
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+
+      const data = await res.json();
+      if (!data || !data.activeListings) throw new Error("bad payload");
+
+      marketData = data;
+      renderMarketPanel(data);
+      status.textContent = "";
+      toast("Market data loaded.");
+    } catch (err) {
+      console.error(err);
+      status.textContent = "Market data could not be loaded. You can still generate the valuation report without it.";
+      toast("Market data unavailable.");
+    } finally {
+      marketBusy = false;
+      btn.disabled = false;
+      const refresh = !!marketData;
+      if (longLbl) longLbl.textContent = refresh ? "Refresh market data" : "Fetch market data";
+      if (shortLbl) shortLbl.textContent = refresh ? "Refresh" : "Market data";
+    }
+  }
+
+  function renderMarketPanel(d) {
+    const panel = $("#marketPanel");
+    if (!panel) return;
+
+    const al = (d && d.activeListings) || {};
+    const ac = (d && d.auctionComps) || {};
+    const fetchedDate = d && d.fetchedAt
+      ? new Date(d.fetchedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+      : "—";
+
+    panel.style.display = "block";
+    panel.innerHTML =
+      '<div class="card-head">' +
+        '<h2>Market snapshot</h2>' +
+        '<div class="card-head-actions">' +
+          '<button id="btnClearMarket" class="btn btn-ghost" type="button" style="min-height:32px;padding:6px 10px;font-size:12px;">Clear</button>' +
+          '<span class="pill">' + fetchedDate + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="grid">' +
+        '<div class="field">' +
+          '<span class="metric-label">Comparable units on market</span>' +
+          '<span class="metric-value">' + (al.count == null ? "—" : al.count) + '</span>' +
+          '<p class="metric-sub">Median asking: <strong>' + fmtMoney(al.medianPrice) + '</strong><br>' +
+          'Range: ' + (al.priceRange || "—") + '</p>' +
+        '</div>' +
+        '<div class="field">' +
+          '<span class="metric-label">Recent auction comps</span>' +
+          '<span class="metric-value">' + (ac.count == null ? "—" : ac.count) + '</span>' +
+          '<p class="metric-sub">Median sold: <strong>' + fmtMoney(ac.medianSoldPrice) + '</strong><br>' +
+          'Range: ' + (ac.soldRange || "—") + '</p>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  PDF — page 1 (cover + unit details)
+   * ------------------------------------------------------------------ */
+  function buildPDF() {
+    const jsPDFCtor = window.jspdf && window.jspdf.jsPDF;
+    if (!jsPDFCtor) {
+      toast("PDF library not loaded — check your connection and reload.");
+      return null;
+    }
+
+    const doc = new jsPDFCtor({ unit: "mm", format: "a4", compress: true });
+    const W = 210, M = 16, RIGHT = W - M;
+    const d = getData();
+    const show = (v) => clean(v) || "\u2014";
+
+    /* header band */
+    doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+    doc.rect(0, 0, W, 64, "F");
+    doc.setFillColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+    doc.rect(0, 64, W, 3, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text("EQUIPMENT VALUATION", M, 16, { charSpace: 1.6 });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text(
+      "Prepared " + new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+      RIGHT, 16, { align: "right" }
+    );
+
+    /* customer name + subtitle */
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    let nameLines = doc.splitTextToSize(clean(d.customerName) || "Customer Name", 110);
+    if (nameLines.length > 2) {
+      nameLines = nameLines.slice(0, 2);
+      nameLines[1] = nameLines[1].replace(/\s+\S*$/, "") + "...";
+    }
+    nameLines.forEach((line, i) => doc.text(line, M, 38 + i * 9.2));
+
+    const subY = 38 + (nameLines.length - 1) * 9.2 + 11.5;
+    if (clean(d.subtitle)) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(ORANGE_SOFT[0], ORANGE_SOFT[1], ORANGE_SOFT[2]);
+      const subLines = doc.splitTextToSize(clean(d.subtitle), 110).slice(0, 2);
+      subLines.forEach((line, i) => doc.text(line, M, subY + i * 5.4));
+    }
+
+    /* photo card */
+    const boxX = 134, boxY = 48, boxW = 60, boxH = 60;
+    doc.setFillColor(255, 255, 255);
+    doc.rect(boxX - 3, boxY - 3, boxW + 6, boxH + 6, "F");
+
+    let photoPlaced = false;
+    if (d.photo) {
+      let pw = Number(d.photoW) || 0;
+      let ph = Number(d.photoH) || 0;
+      if (!pw || !ph) {
+        try {
+          const p = doc.getImageProperties(d.photo);
+          pw = p.width; ph = p.height;
+        } catch (e) { pw = 0; ph = 0; }
+      }
+      try {
+        if (pw > 0 && ph > 0) {
+          const ratio = Math.min(boxW / pw, boxH / ph);
+          const w = pw * ratio, h = ph * ratio;
+          doc.addImage(d.photo, "JPEG",
+            boxX + (boxW - w) / 2, boxY + (boxH - h) / 2, w, h, undefined, "FAST");
+        } else {
+          doc.addImage(d.photo, "JPEG", boxX, boxY, boxW, boxH, undefined, "FAST");
+        }
+        photoPlaced = true;
+      } catch (e) { photoPlaced = false; }
+    }
+
+    if (photoPlaced) {
+      doc.setDrawColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+      doc.setLineWidth(0.9);
+      doc.rect(boxX, boxY, boxW, boxH);
+    } else {
+      doc.setFillColor(GREY_LIGHT[0], GREY_LIGHT[1], GREY_LIGHT[2]);
+      doc.rect(boxX, boxY, boxW, boxH, "F");
+      doc.setDrawColor(GREY_300[0], GREY_300[1], GREY_300[2]);
+      doc.setLineWidth(0.4);
+      doc.rect(boxX, boxY, boxW, boxH);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
+      doc.text("CUSTOMER PHOTO", boxX + boxW / 2, boxY + boxH / 2 + 1.2, { align: "center", charSpace: 0.6 });
+    }
+
+    /* section divider */
+    let y = 120;
+    doc.setDrawColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+    doc.setLineWidth(1);
+    doc.line(M, y, RIGHT, y);
+
+    doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+    doc.rect(M, y + 8.6, 3.2, 3.2, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+    doc.text("UNIT INFORMATION", M + 7, y + 11.5, { charSpace: 0.7 });
+
+    doc.setDrawColor(GREY_LINE[0], GREY_LINE[1], GREY_LINE[2]);
+    doc.setLineWidth(0.4);
+    doc.line(M, y + 16, RIGHT, y + 16);
+
+    /* table — Attachments removed */
+    const rows = [
+      ["Year",           show(d.year)],
+      ["Make",           show(d.make)],
+      ["Model",          show(d.model)],
+      ["Equipment Type", show(d.equipmentType)],
+      ["Hours",          show(d.hours)],
+      ["Condition",      show(d.condition)],
+      ["Serial / VIN",   show(d.serial)],
+      ["Region",         show(d.region)],
+      ["Use Window",     windowText(d)]
+    ];
+
+    const rowH = 13;
+    const labelW = 54;
+    const valueX = M + labelW + 7;
+    const valueW = RIGHT - valueX;
+    let ty = y + 20;
+
+    rows.forEach(function (row) {
+      doc.setFillColor(GREY_LIGHT[0], GREY_LIGHT[1], GREY_LIGHT[2]);
+      doc.rect(M, ty, labelW, rowH, "F");
+      doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+      doc.rect(M, ty, 1.8, rowH, "F");
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(GREY_700[0], GREY_700[1], GREY_700[2]);
+      doc.text(row[0].toUpperCase(), M + 7, ty + rowH / 2 + 1.1, { charSpace: 0.5 });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11.5);
+      doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+      let lines = doc.splitTextToSize(String(row[1]), valueW);
+      if (lines.length > 2) {
+        lines = lines.slice(0, 2);
+        lines[1] = lines[1].replace(/\s+\S*$/, "") + "...";
+      }
+      const baseY = ty + rowH / 2 + 1.4 - (lines.length - 1) * 2.6;
+      lines.forEach((line, i) => doc.text(line, valueX, baseY + i * 5.2));
+
+      doc.setDrawColor(GREY_LINE[0], GREY_LINE[1], GREY_LINE[2]);
+      doc.setLineWidth(0.3);
+      doc.line(M, ty + rowH, RIGHT, ty + rowH);
+
+      ty += rowH;
+    });
+
+    /* footer */
+    doc.setDrawColor(GREY_LINE[0], GREY_LINE[1], GREY_LINE[2]);
+    doc.setLineWidth(0.4);
+    doc.line(M, 276, RIGHT, 276);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
+    doc.text("Equipment Valuation Report", M, 282);
+    const totalPages = marketData ? 2 : 1;
+    doc.text("Page 1 of " + totalPages, RIGHT, 282, { align: "right" });
+
+    return doc;
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  PDF — page 2 (market analysis)
+   * ------------------------------------------------------------------ */
+  function drawMetricCard(doc, x, y, w, h, label, value, sub, range) {
+    doc.setFillColor(GREY_LIGHT[0], GREY_LIGHT[1], GREY_LIGHT[2]);
+    doc.roundedRect(x, y, w, h, 3, 3, "F");
+
+    doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+    doc.rect(x, y, 2.4, h, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(GREY_700[0], GREY_700[1], GREY_700[2]);
+    doc.text(label, x + 7, y + 8, { charSpace: 0.4 });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+    doc.text(value, x + 7, y + 21);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
+    doc.text(sub, x + 7, y + 27);
+    if (range) doc.text("Range " + range, x + 7, y + 31.5);
+  }
+
+  function buildMarketPage(doc, market) {
+    if (!market) return;
+    const W = 210, M = 16, RIGHT = W - M;
+    doc.addPage();
+
+    /* page header */
+    doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+    doc.rect(0, 0, W, 28, "F");
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("MARKET ANALYSIS", M, 17);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    const q = (market.query || {});
+    doc.text(
+      "Prepared for " + (clean(q.make) + " " + clean(q.model)).trim(),
+      RIGHT, 17, { align: "right" }
+    );
+
+    /* title */
+    doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Valuation Context", M, 44);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
+    const snap = market.fetchedAt ? new Date(market.fetchedAt) : new Date();
+    doc.text(
+      "Snapshot as of " + snap.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }),
+      M, 51
+    );
+
+    /* key metrics */
+    const cardY = 62;
+    const cardW = (RIGHT - M - 8) / 2;
+    const cardH = 34;
+    const al = market.activeListings || {};
+    const ac = market.auctionComps || {};
+
+    drawMetricCard(doc, M, cardY, cardW, cardH,
+      "ACTIVE COMPARABLE UNITS",
+      String(al.count == null ? "—" : al.count),
+      "Median asking " + fmtMoney(al.medianPrice),
+      al.priceRange
+    );
+    drawMetricCard(doc, M + cardW + 8, cardY, cardW, cardH,
+      "RECENT AUCTION SALES",
+      String(ac.count == null ? "—" : ac.count),
+      "Median sold " + fmtMoney(ac.medianSoldPrice),
+      ac.soldRange
+    );
+
+    /* active listings */
+    let ty = cardY + cardH + 18;
+
+    doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+    doc.rect(M, ty, 3, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+    doc.text("COMPARABLE LISTINGS", M + 6, ty + 5);
+    ty += 10;
+
+    const headers = ["Year", "Listing", "Price", "Hours", "Location"];
+    const colX = [M, M + 14, RIGHT - 52, RIGHT - 26, RIGHT - 18];
+    const colW = [12, 70, 24, 16, 16];
+
+    doc.setFillColor(GREY_LIGHT[0], GREY_LIGHT[1], GREY_LIGHT[2]);
+    doc.rect(M, ty, RIGHT - M, 8, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(GREY_700[0], GREY_700[1], GREY_700[2]);
+    headers.forEach((h, i) => doc.text(h.toUpperCase(), colX[i] + 2, ty + 5.2, { charSpace: 0.3 }));
+    ty += 8;
+
+    const listings = al.examples || [];
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+
+    listings.forEach((l) => {
+      if (ty > 250) return;
+      const title = doc.splitTextToSize(l.title || "—", colW[1] - 4)[0] || "—";
+      doc.text(String(l.year || "—"), colX[0] + 2, ty + 5);
+      doc.text(title, colX[1] + 2, ty + 5);
+      doc.text(fmtMoney(l.price), colX[2] + 2, ty + 5);
+      doc.text(l.hours ? String(l.hours) : "—", colX[3] + 2, ty + 5);
+      doc.text(String(l.location || "—").slice(0, 14), colX[4] + 2, ty + 5);
+
+      doc.setDrawColor(GREY_LINE[0], GREY_LINE[1], GREY_LINE[2]);
+      doc.setLineWidth(0.25);
+      doc.line(M, ty + 7, RIGHT, ty + 7);
+      ty += 8;
+    });
+
+    if (!listings.length) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
+      doc.text("No matching active listings were returned for this query.", M, ty + 6);
+      ty += 12;
+    }
+
+    /* auctions */
+    ty += 6;
+    doc.setFillColor(ORANGE[0], ORANGE[1], ORANGE[2]);
+    doc.rect(M, ty, 3, 6, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+    doc.text("RECENT AUCTION RESULTS", M + 6, ty + 5);
+    ty += 10;
+
+    const auctions = ac.recent || [];
+    auctions.forEach((a) => {
+      if (ty > 260) return;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(GREY_DARK[0], GREY_DARK[1], GREY_DARK[2]);
+      const t = doc.splitTextToSize(a.title || "—", 120)[0] || "—";
+      doc.text(t, M + 2, ty + 4);
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(fmtMoney(a.soldPrice), RIGHT, ty + 4, { align: "right" });
+
+      doc.setFontSize(7.5);
+      doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
+      const meta = [a.soldDate, a.location, a.event].filter(Boolean).join("  ·  ");
+      if (meta) doc.text(meta, M + 2, ty + 9);
+
+      doc.setDrawColor(GREY_LINE[0], GREY_LINE[1], GREY_LINE[2]);
+      doc.line(M, ty + 12, RIGHT, ty + 12);
+      ty += 15;
+    });
+
+    if (!auctions.length) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
+      doc.text("No matching sold auction results were returned for this query.", M, ty + 6);
+    }
+
+    /* footer + disclaimer */
+    doc.setDrawColor(GREY_LINE[0], GREY_LINE[1], GREY_LINE[2]);
+    doc.setLineWidth(0.4);
+    doc.line(M, 274, RIGHT, 274);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(GREY_500[0], GREY_500[1], GREY_500[2]);
+    const disclaimer = doc.splitTextToSize(
+      "Market data is gathered from public marketplace listings and auction results and is provided for comparative context only. It does not constitute a formal appraisal. Figures are subject to change and should be verified independently.",
+      RIGHT - M
+    );
+    disclaimer.forEach((line, i) => doc.text(line, M, 279 + i * 3.6));
+    doc.text("Page 2 of 2", RIGHT, 291, { align: "right" });
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  PDF generation
+   * ------------------------------------------------------------------ */
+  function generatePDF() {
+    if (busy) return;
+    busy = true;
+    try {
+      const doc = buildPDF();
+      if (!doc) return;
+
+      if (marketData) buildMarketPage(doc, marketData);
+
+      const blob = doc.output("blob");
+      deliverBlob(blob, slug(getData().customerName) + "-valuation.pdf");
+      toast(marketData ? "Valuation report generated." : "Report generated — add market data for a full valuation.");
+    } catch (err) {
+      console.error(err);
+      toast("Something went wrong while building the PDF.");
+    } finally {
+      busy = false;
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Import / Export
+   * ------------------------------------------------------------------ */
+  function exportProject() {
+    if (busy) return;
+    busy = true;
+    try {
+      const data = getData();
+      data._type = "equipment-valuation-project";
+      data._version = 2;
+      data.exportedAt = new Date().toISOString();
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      deliverBlob(blob, slug(data.customerName) + "-project.json");
+      toast("Project file exported.");
+    } finally {
+      busy = false;
+    }
+  }
+
+  function importProject(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onerror = () => toast("Could not read that file.");
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result));
+        if (!data || typeof data !== "object") throw new Error("bad shape");
+        setData(data);
+        toast("Project imported.");
+      } catch (e) {
+        toast("That file isn't a valid project export.");
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Wiring
+   * ------------------------------------------------------------------ */
+  Object.keys(fields).forEach((k) => {
+    fields[k].addEventListener("input", saveDraft);
+    fields[k].addEventListener("change", saveDraft);
+  });
+
+  $("#btnPdf").addEventListener("click", generatePDF);
+  $("#btnExport").addEventListener("click", exportProject);
+  $("#btnMarket").addEventListener("click", fetchMarketData);
+
+  $("#btnImport").addEventListener("click", () => importInput.click());
+  importInput.addEventListener("change", (e) => {
+    importProject(e.target.files && e.target.files[0]);
+    e.target.value = "";
+  });
+
+  $("#marketPanel").addEventListener("click", (e) => {
+    const t = e.target;
+    if (t && t.id === "btnClearMarket") {
+      marketData = null;
+      $("#marketPanel").style.display = "none";
+      const longLbl = $("#btnMarket").querySelector(".lbl-long");
+      const shortLbl = $("#btnMarket").querySelector(".lbl-short");
+      if (longLbl) longLbl.textContent = "Fetch market data";
+      if (shortLbl) shortLbl.textContent = "Market data";
+      saveDraft();
+      toast("Market data cleared from report.");
+    }
+  });
+
+  $("#btnNew").addEventListener("click", () => {
+    const hasContent = Object.keys(fields).some((k) => clean(fields[k].value)) || photoData || marketData;
+    if (hasContent && !confirm("Clear this report and start a new one?")) return;
+    Object.keys(fields).forEach((k) => { fields[k].value = ""; });
+    photoData = "";
+    photoW = 0;
+    photoH = 0;
+    marketData = null;
+    renderPhoto();
+    $("#marketPanel").style.display = "none";
+    $("#marketStatus").textContent = "";
+    const longLbl = $("#btnMarket").querySelector(".lbl-long");
+    const shortLbl = $("#btnMarket").querySelector(".lbl-short");
+    if (longLbl) longLbl.textContent = "Fetch market data";
+    if (shortLbl) shortLbl.textContent = "Market data";
+    saveDraft();
+    toast("New report started.");
+  });
+
+  $("#btnPhoto").addEventListener("click", () => photoInput.click());
+  photoPreview.addEventListener("click", () => photoInput.click());
+  photoPreview.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); photoInput.click(); }
+  });
+  photoInput.addEventListener("change", (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (file) handlePhotoFile(file);
+  });
+
+  $("#btnPhotoClear").addEventListener("click", () => {
+    photoData = "";
+    photoW = 0;
+    photoH = 0;
+    renderPhoto();
+    saveDraft();
+    toast("Photo removed.");
+  });
+
+  ["dragenter", "dragover"].forEach((evt) =>
+    photoPreview.addEventListener(evt, (e) => {
+      e.preventDefault();
+      photoPreview.style.borderColor = "#EA580C";
+    })
+  );
+  ["dragleave", "drop"].forEach((evt) =>
+    photoPreview.addEventListener(evt, (e) => {
+      e.preventDefault();
+      photoPreview.style.borderColor = "";
+    })
+  );
+  photoPreview.addEventListener("drop", (e) => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handlePhotoFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  /* ------------------------------------------------------------------ *
+   *  Boot
+   * ------------------------------------------------------------------ */
+  loadDraft();
+  renderPhoto();
+})();
+</script>
+
+</body>
+</html>
