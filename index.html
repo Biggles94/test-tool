@@ -777,7 +777,28 @@
           '<p class="metric-sub">Median sold: <strong>' + fmtMoney(ac.medianSoldPrice) + '</strong><br>' +
           'Range: ' + (ac.soldRange || "—") + '</p>' +
         '</div>' +
-      '</div>';
+      '</div>' +
+      warningBlock(d);
+  }
+
+  /* NEW — renders any partial-failure warnings from the Worker */
+  function warningBlock(d) {
+    const warnings = (d && d.warnings) || [];
+    if (!warnings.length) return "";
+
+    const rows = warnings
+      .map((w) => '<div><strong>' + (w.source || "source") + ':</strong> ' +
+                  String(w.error || "unknown error").replace(/</g, "&lt;") + '</div>')
+      .join("");
+
+    return '<div style="margin-top:14px;padding:10px 12px;' +
+           'border-left:3px solid #EA580C;background:#FFF1E7;' +
+           'border-radius:6px;font-size:12px;line-height:1.5;color:#4B4B4B;">' +
+             rows +
+             '<div style="margin-top:6px;font-size:11px;color:#7A7A7A;">' +
+               'The report will still generate with the data that succeeded.' +
+             '</div>' +
+           '</div>';
   }
 
   /* ------------------------------------------------------------------ *
